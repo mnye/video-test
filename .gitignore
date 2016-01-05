@@ -1,0 +1,8 @@
+.*.swp
+*.suo
+*.vs
+*.csproj.user
+*.sln.DotSettings.user
+/TestResults/
+bin
+obj
