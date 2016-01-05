@@ -6,3 +6,4 @@
 /TestResults/
 bin
 obj
+packages/*
