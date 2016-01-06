@@ -37,6 +37,9 @@
       this.previewCount = new System.Windows.Forms.TextBox();
       this.label1 = new System.Windows.Forms.Label();
       this.label2 = new System.Windows.Forms.Label();
+      this.writeRaw = new System.Windows.Forms.CheckBox();
+      this.writeEncoded = new System.Windows.Forms.CheckBox();
+      this.label3 = new System.Windows.Forms.Label();
       this.SuspendLayout();
       // 
       // find
@@ -55,7 +58,7 @@
             | System.Windows.Forms.AnchorStyles.Right)));
       this.deviceName.Location = new System.Drawing.Point(93, 38);
       this.deviceName.Name = "deviceName";
-      this.deviceName.Size = new System.Drawing.Size(456, 20);
+      this.deviceName.Size = new System.Drawing.Size(457, 20);
       this.deviceName.TabIndex = 1;
       // 
       // stream
@@ -75,7 +78,7 @@
             | System.Windows.Forms.AnchorStyles.Right)));
       this.notifications.Location = new System.Drawing.Point(12, 12);
       this.notifications.Name = "notifications";
-      this.notifications.Size = new System.Drawing.Size(537, 20);
+      this.notifications.Size = new System.Drawing.Size(538, 20);
       this.notifications.TabIndex = 3;
       // 
       // previewBox
@@ -86,28 +89,33 @@
       this.previewBox.BackColor = System.Drawing.Color.Black;
       this.previewBox.Location = new System.Drawing.Point(12, 94);
       this.previewBox.Name = "previewBox";
-      this.previewBox.Size = new System.Drawing.Size(537, 363);
+      this.previewBox.Size = new System.Drawing.Size(538, 351);
       this.previewBox.TabIndex = 4;
       this.previewBox.VSync = false;
       // 
       // frameCount
       // 
-      this.frameCount.Location = new System.Drawing.Point(140, 67);
+      this.frameCount.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Right)));
+      this.frameCount.Location = new System.Drawing.Point(408, 67);
       this.frameCount.Name = "frameCount";
+      this.frameCount.ReadOnly = true;
       this.frameCount.Size = new System.Drawing.Size(49, 20);
       this.frameCount.TabIndex = 5;
       // 
       // previewCount
       // 
-      this.previewCount.Location = new System.Drawing.Point(233, 67);
+      this.previewCount.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Right)));
+      this.previewCount.Location = new System.Drawing.Point(501, 67);
       this.previewCount.Name = "previewCount";
+      this.previewCount.ReadOnly = true;
       this.previewCount.Size = new System.Drawing.Size(49, 20);
       this.previewCount.TabIndex = 6;
       // 
       // label1
       // 
+      this.label1.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Right)));
       this.label1.AutoSize = true;
-      this.label1.Location = new System.Drawing.Point(93, 70);
+      this.label1.Location = new System.Drawing.Point(361, 70);
       this.label1.Name = "label1";
       this.label1.Size = new System.Drawing.Size(41, 13);
       this.label1.TabIndex = 7;
@@ -115,18 +123,51 @@
       // 
       // label2
       // 
+      this.label2.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Right)));
       this.label2.AutoSize = true;
-      this.label2.Location = new System.Drawing.Point(195, 70);
+      this.label2.Location = new System.Drawing.Point(463, 70);
       this.label2.Name = "label2";
       this.label2.Size = new System.Drawing.Size(32, 13);
       this.label2.TabIndex = 8;
       this.label2.Text = "Prev.";
       // 
+      // writeRaw
+      // 
+      this.writeRaw.AutoSize = true;
+      this.writeRaw.Location = new System.Drawing.Point(138, 69);
+      this.writeRaw.Name = "writeRaw";
+      this.writeRaw.Size = new System.Drawing.Size(48, 17);
+      this.writeRaw.TabIndex = 9;
+      this.writeRaw.Text = "Raw";
+      this.writeRaw.UseVisualStyleBackColor = true;
+      // 
+      // writeEncoded
+      // 
+      this.writeEncoded.AutoSize = true;
+      this.writeEncoded.Location = new System.Drawing.Point(192, 69);
+      this.writeEncoded.Name = "writeEncoded";
+      this.writeEncoded.Size = new System.Drawing.Size(52, 17);
+      this.writeEncoded.TabIndex = 10;
+      this.writeEncoded.Text = "H264";
+      this.writeEncoded.UseVisualStyleBackColor = true;
+      // 
+      // label3
+      // 
+      this.label3.AutoSize = true;
+      this.label3.Location = new System.Drawing.Point(93, 70);
+      this.label3.Name = "label3";
+      this.label3.Size = new System.Drawing.Size(39, 13);
+      this.label3.TabIndex = 11;
+      this.label3.Text = "Output";
+      // 
       // Form1
       // 
       this.AutoScaleDimensions = new System.Drawing.SizeF(6F, 13F);
       this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
-      this.ClientSize = new System.Drawing.Size(561, 469);
+      this.ClientSize = new System.Drawing.Size(562, 457);
+      this.Controls.Add(this.label3);
+      this.Controls.Add(this.writeEncoded);
+      this.Controls.Add(this.writeRaw);
       this.Controls.Add(this.label2);
       this.Controls.Add(this.label1);
       this.Controls.Add(this.previewCount);
@@ -158,6 +199,9 @@
     private System.Windows.Forms.TextBox previewCount;
     private System.Windows.Forms.Label label1;
     private System.Windows.Forms.Label label2;
+    private System.Windows.Forms.CheckBox writeRaw;
+    private System.Windows.Forms.CheckBox writeEncoded;
+    private System.Windows.Forms.Label label3;
   }
 }
 

@@ -18,15 +18,18 @@ using OpenTK.Platform;
 
 namespace VideoTest
 {
-  public partial class Form1 : Form, IDeckLinkDeviceNotificationCallback, IDeckLinkInputCallback, 
-    IDeckLinkScreenPreviewCallback, IBMDStreamingDeviceNotificationCallback
+  /// <summary>
+  /// Raw video output can be viewed with mplayer
+  /// e.g., "mplayer c:\Temp\videotest.raw -demuxer rawvideo -rawvideo w=1920:h=1080:uyvy:fps=25"
+  /// May need to tweak w / h / fps parameters depending on input format
+  /// </summary>
+  public partial class Form1 : Form, IDeckLinkDeviceNotificationCallback, IDeckLinkInputCallback, IDeckLinkScreenPreviewCallback
   {
     private readonly _BMDAudioSampleRate _AudioSampleRate = _BMDAudioSampleRate.bmdAudioSampleRate48kHz;
     private readonly _BMDAudioSampleType _AudioSampleType = _BMDAudioSampleType.bmdAudioSampleType32bitInteger;
     private readonly uint _AudioChannels = 2;
     private readonly uint _AudioSampleDepth = 32;
-
-    private readonly IBMDStreamingDiscovery _BMDDiscovery;
+    
     private readonly IDeckLinkDiscovery _Discovery;
     private readonly IDeckLinkGLScreenPreviewHelper _GLHelper;
 
@@ -36,18 +39,16 @@ namespace VideoTest
     private IDeckLink _DeckLink = null;
     private System.Timers.Timer _GLHack = new System.Timers.Timer();
     private BinaryWriter _VideoWriter = null;
-    
+    private BinaryWriter _AudioWriter = null;
+
     public Form1()
     {
       InitializeComponent();
 
       _Discovery = new CDeckLinkDiscovery();
       _GLHelper = new CDeckLinkGLScreenPreviewHelper();
-
-      _BMDDiscovery = new CBMDStreamingDiscovery();
-
+      
       if (_Discovery != null) _Discovery.InstallDeviceNotifications(this);
-      if (_BMDDiscovery != null) _BMDDiscovery.InstallDeviceNotifications(this);
 
       previewBox.Paint += PreviewBox_Paint;
 
@@ -90,7 +91,6 @@ namespace VideoTest
       }
 
       if (_Discovery != null) _Discovery.UninstallDeviceNotifications();
-      if (_BMDDiscovery != null) _BMDDiscovery.UninstallDeviceNotifications();
     }
 
     private void Run(Action act)
@@ -185,7 +185,11 @@ namespace VideoTest
         if (support != _BMDDisplayModeSupport.bmdDisplayModeSupported)
           throw new Exception("display mode not working: " + support);
 
-        _VideoWriter = new BinaryWriter(File.Open("c:/Temp/video.raw", FileMode.OpenOrCreate));
+        if (writeRaw.Checked)
+        {
+          _VideoWriter = new BinaryWriter(File.Open("video.raw", FileMode.OpenOrCreate));
+          _AudioWriter = new BinaryWriter(File.Open("audio.raw", FileMode.OpenOrCreate));
+        }
 
         input.EnableVideoInput(display, format, flags);
         input.EnableAudioInput(_AudioSampleRate, _AudioSampleType, _AudioChannels);
@@ -220,6 +224,13 @@ namespace VideoTest
         _VideoWriter.Dispose();
         _VideoWriter = null;
       }
+
+      if (_AudioWriter != null)
+      {
+        _AudioWriter.Close();
+        _AudioWriter.Dispose();
+        _AudioWriter = null;
+      }
     }
 
     /// <summary>
@@ -252,11 +263,11 @@ namespace VideoTest
           var frame = new byte[rowBytes * height];
           Marshal.Copy(framePointer, frame, 0, frame.Length);
 
-          // Write it to file
-          _VideoWriter.Write(frame);
+          if (writeRaw.Checked)
+            _VideoWriter.Write(frame);
         }
 
-        /*if (audioPacket != null)
+        if (audioPacket != null)
         {
           IntPtr audioPointer;
           audioPacket.GetBytes(out audioPointer);
@@ -264,8 +275,11 @@ namespace VideoTest
           var frameCount = audioPacket.GetSampleFrameCount();
 
           var audio = new byte[frameCount * _AudioChannels * (_AudioSampleDepth / 8)];
-          Marshal.Copy(audioPointer, audio, 0, audio.Length);          
-        }*/
+          Marshal.Copy(audioPointer, audio, 0, audio.Length);
+
+          if (writeRaw.Checked)
+            _AudioWriter.Write(audio);
+        }
       }
       finally
       {
@@ -317,20 +331,6 @@ namespace VideoTest
       previewBox.SwapBuffers();
 
       previewBox.Context.MakeCurrent(null);
-    }
-
-    // BMD CALLBACKS:
-
-    public void StreamingDeviceArrived(IDeckLink device)
-    {
-    }
-
-    public void StreamingDeviceRemoved(IDeckLink device)
-    {
-    }
-
-    public void StreamingDeviceModeChanged(IDeckLink device, _BMDStreamingDeviceMode mode)
-    {
     }
   }
 }
