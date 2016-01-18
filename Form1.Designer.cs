@@ -40,6 +40,7 @@
       this.writeRaw = new System.Windows.Forms.CheckBox();
       this.writeEncoded = new System.Windows.Forms.CheckBox();
       this.label3 = new System.Windows.Forms.Label();
+      this.burn = new System.Windows.Forms.Button();
       this.SuspendLayout();
       // 
       // find
@@ -87,9 +88,9 @@
             | System.Windows.Forms.AnchorStyles.Left) 
             | System.Windows.Forms.AnchorStyles.Right)));
       this.previewBox.BackColor = System.Drawing.Color.Black;
-      this.previewBox.Location = new System.Drawing.Point(12, 94);
+      this.previewBox.Location = new System.Drawing.Point(12, 123);
       this.previewBox.Name = "previewBox";
-      this.previewBox.Size = new System.Drawing.Size(538, 351);
+      this.previewBox.Size = new System.Drawing.Size(538, 397);
       this.previewBox.TabIndex = 4;
       this.previewBox.VSync = false;
       // 
@@ -160,11 +161,22 @@
       this.label3.TabIndex = 11;
       this.label3.Text = "Output";
       // 
+      // burn
+      // 
+      this.burn.Location = new System.Drawing.Point(12, 94);
+      this.burn.Name = "burn";
+      this.burn.Size = new System.Drawing.Size(75, 23);
+      this.burn.TabIndex = 12;
+      this.burn.Text = "Burn";
+      this.burn.UseVisualStyleBackColor = true;
+      this.burn.Click += new System.EventHandler(this.burn_Click);
+      // 
       // Form1
       // 
       this.AutoScaleDimensions = new System.Drawing.SizeF(6F, 13F);
       this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
-      this.ClientSize = new System.Drawing.Size(562, 457);
+      this.ClientSize = new System.Drawing.Size(562, 532);
+      this.Controls.Add(this.burn);
       this.Controls.Add(this.label3);
       this.Controls.Add(this.writeEncoded);
       this.Controls.Add(this.writeRaw);
@@ -202,6 +214,7 @@
     private System.Windows.Forms.CheckBox writeRaw;
     private System.Windows.Forms.CheckBox writeEncoded;
     private System.Windows.Forms.Label label3;
+    private System.Windows.Forms.Button burn;
   }
 }
 

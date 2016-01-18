@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Data;
 using System.Drawing;
@@ -10,7 +11,14 @@ using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows.Forms;
+using CSCore.Codecs.RAW;
+using CSCore.Codecs.WAV;
 using DeckLinkAPI;
+using Microsoft.Expression.Encoder;
+using Microsoft.Expression.Encoder.Devices;
+using Microsoft.Expression.Encoder.Live;
+using Microsoft.Expression.Encoder.Profiles;
+using NReco.VideoConverter;
 using OpenTK;
 using OpenTK.Graphics.OpenGL;
 using OpenTK.Input;
@@ -22,6 +30,9 @@ namespace VideoTest
   /// Raw video output can be viewed with mplayer
   /// e.g., "mplayer c:\Temp\videotest.raw -demuxer rawvideo -rawvideo w=1920:h=1080:uyvy:fps=25"
   /// May need to tweak w / h / fps parameters depending on input format
+  /// 
+  /// FFMPEG compression
+  /// "ffmpeg -f rawvideo -pix_fmt uyvy422 -s:v 1920x1080 -r 25 -i c:\Temp\videotest.raw -c:v libx264 c:\Temp\output.mpg"
   /// </summary>
   public partial class Form1 : Form, IDeckLinkDeviceNotificationCallback, IDeckLinkInputCallback, IDeckLinkScreenPreviewCallback
   {
@@ -38,8 +49,25 @@ namespace VideoTest
     private bool _Streaming = false;
     private IDeckLink _DeckLink = null;
     private System.Timers.Timer _GLHack = new System.Timers.Timer();
+    private readonly SemaphoreSlim _VideoLock = new SemaphoreSlim(1);
+
+    // Raw video/audio files
     private BinaryWriter _VideoWriter = null;
     private BinaryWriter _AudioWriter = null;
+
+    // NReco.VideoConverter
+    private readonly FFMpegConverter _VideoConverter = new FFMpegConverter();
+    private FileStream _EncodedStream = null;
+    private ConvertLiveMediaTask _EncodeTask = null;
+
+    // Microsoft.Expression.Encoder (Not currently using, just here for reference)
+    private LiveJob _Job = null;
+
+    private string _RawVideoFile = "out_video.raw";
+    private string _RawAudioFile = "out_audio.raw";
+    private string _EncodedVideoFile = "out_video.h264";
+    private string _WavAudioFile = "out_audio.wav";
+    private string _FinalFile = "out_fin.mp4";
 
     public Form1()
     {
@@ -49,9 +77,7 @@ namespace VideoTest
       _GLHelper = new CDeckLinkGLScreenPreviewHelper();
       
       if (_Discovery != null) _Discovery.InstallDeviceNotifications(this);
-
-      previewBox.Paint += PreviewBox_Paint;
-
+      
       find.Enabled = false;
       stream.Enabled = false;
       notifications.Text = "Please wait 2 seconds for the preview box to initialise...";
@@ -69,11 +95,6 @@ namespace VideoTest
         stream.Enabled = true;
         SetupPreviewBox();
       });
-    }
-
-    private void PreviewBox_Paint(object sender, PaintEventArgs e)
-    {
-      //_GLHelper.PaintGL();
     }
     
     private void Form1_Load(object sender, EventArgs e)
@@ -126,7 +147,7 @@ namespace VideoTest
     }
 
     private void find_Click(object sender, EventArgs e)
-    {
+    {      
       // Create the COM instance
       IDeckLinkIterator deckLinkIterator = new CDeckLinkIterator();
       if (deckLinkIterator == null)
@@ -187,8 +208,24 @@ namespace VideoTest
 
         if (writeRaw.Checked)
         {
-          _VideoWriter = new BinaryWriter(File.Open("video.raw", FileMode.OpenOrCreate));
-          _AudioWriter = new BinaryWriter(File.Open("audio.raw", FileMode.OpenOrCreate));
+          _VideoWriter = new BinaryWriter(File.Open(_RawVideoFile, FileMode.OpenOrCreate));
+          _AudioWriter = new BinaryWriter(File.Open(_RawAudioFile, FileMode.OpenOrCreate));
+        }
+
+        if (writeEncoded.Checked)
+        {
+          _EncodedStream = new FileStream(_EncodedVideoFile, FileMode.Create, FileAccess.Write);
+
+          _EncodeTask = _VideoConverter.ConvertLiveMedia(
+            "rawvideo",
+            _EncodedStream,
+            "h264",
+            new ConvertSettings()
+            {
+              CustomInputArgs = " -pix_fmt uyvy422 -video_size 1920x1080 -framerate 25",
+            });
+
+          _EncodeTask.Start();
         }
 
         input.EnableVideoInput(display, format, flags);
@@ -205,19 +242,31 @@ namespace VideoTest
     {
       if (!_Streaming) return;
 
-      var input = (IDeckLinkInput)_DeckLink;
+      _VideoLock.Wait();
+      try
+      {
+        var input = (IDeckLinkInput)_DeckLink;
 
-      input.StopStreams();
-      input.DisableVideoInput();
-      input.DisableAudioInput();
+        input.StopStreams();
+        input.DisableVideoInput();
+        input.DisableAudioInput();
 
-      stream.Text = "Stream";
-      _Streaming = false;
-      _FrameCount = 0;
-      _PreviewCount = 0;
-      frameCount.Text = string.Empty;
-      previewCount.Text = string.Empty;
+        stream.Text = "Stream";
+        _Streaming = false;
+        _FrameCount = 0;
+        _PreviewCount = 0;
+        frameCount.Text = string.Empty;
+        previewCount.Text = string.Empty;
+      }
+      finally
+      {
+        _VideoLock.Release();
+      }
+    }
 
+    private void burn_Click(object sender, EventArgs e)
+    {
+      // Destroy all the writers...
       if (_VideoWriter != null)
       {
         _VideoWriter.Close();
@@ -231,6 +280,57 @@ namespace VideoTest
         _AudioWriter.Dispose();
         _AudioWriter = null;
       }
+
+      if (_EncodeTask != null)
+      {
+        _EncodeTask.Stop();
+        _EncodeTask = null;
+      }
+
+      if (_EncodedStream != null)
+      {
+        _EncodedStream.Close();
+        _EncodedStream.Dispose();
+        _EncodedStream = null;
+      }
+
+      // Make the audio a WAV
+      var sampleData = File.ReadAllBytes(_RawAudioFile);
+
+      using (var waveStream = new MemoryStream())
+      {
+        using (var bw = new BinaryWriter(waveStream))
+        {
+          var audioSampleRate = (int)_AudioSampleRate;
+
+          bw.Write(new char[4] { 'R', 'I', 'F', 'F' });
+          int fileSize = 36 + sampleData.Length;
+          bw.Write(fileSize);
+          bw.Write(new char[8] { 'W', 'A', 'V', 'E', 'f', 'm', 't', ' ' });
+          bw.Write((int)16);
+          bw.Write((short)1);
+          bw.Write((short)_AudioChannels);
+          bw.Write(audioSampleRate);
+          bw.Write((int)(audioSampleRate * ((_AudioSampleDepth * _AudioChannels) / 8)));
+          bw.Write((short)((_AudioSampleDepth * _AudioChannels) / 8));
+          bw.Write((short)_AudioSampleDepth);
+
+          bw.Write(new char[4] { 'd', 'a', 't', 'a' });
+          bw.Write(sampleData.Length);
+
+          bw.Write(sampleData, 0, sampleData.Length);
+
+          waveStream.Position = 0;
+
+          File.WriteAllBytes(_WavAudioFile, waveStream.ToArray());
+        }
+      }
+
+      // Combine them
+      _VideoConverter.ConvertMedia(_EncodedVideoFile, "h264", _FinalFile, null, new ConvertSettings()
+      {
+        CustomOutputArgs = " -i " + _WavAudioFile + " -vcodec libx264 -acodec libmp3lame",
+      });
     }
 
     /// <summary>
@@ -249,36 +349,48 @@ namespace VideoTest
       if (videoFrame == null && audioPacket == null) return;
       try
       {
-        Interlocked.Increment(ref _FrameCount);
-        Run(() => frameCount.Text = _FrameCount.ToString());
-
-        if (videoFrame != null)
+        if (!_Streaming) return;
+        if (!_VideoLock.Wait(TimeSpan.Zero)) return;
+        try
         {
-          var rowBytes = videoFrame.GetRowBytes();
-          var height = videoFrame.GetHeight();
+          Interlocked.Increment(ref _FrameCount);
+          Run(() => frameCount.Text = _FrameCount.ToString());
 
-          IntPtr framePointer;
-          videoFrame.GetBytes(out framePointer);
+          if (videoFrame != null)
+          {
+            var rowBytes = videoFrame.GetRowBytes();
+            var height = videoFrame.GetHeight();
 
-          var frame = new byte[rowBytes * height];
-          Marshal.Copy(framePointer, frame, 0, frame.Length);
+            IntPtr framePointer;
+            videoFrame.GetBytes(out framePointer);
 
-          if (writeRaw.Checked)
-            _VideoWriter.Write(frame);
+            var frame = new byte[rowBytes * height];
+            Marshal.Copy(framePointer, frame, 0, frame.Length);
+
+            if (writeRaw.Checked)
+              _VideoWriter.Write(frame);
+
+            if (writeEncoded.Checked)
+              _EncodeTask.Write(frame, 0, frame.Length);
+          }
+
+          if (audioPacket != null)
+          {
+            IntPtr audioPointer;
+            audioPacket.GetBytes(out audioPointer);
+
+            var frameCount = audioPacket.GetSampleFrameCount();
+
+            var audio = new byte[frameCount * _AudioChannels * (_AudioSampleDepth / 8)];
+            Marshal.Copy(audioPointer, audio, 0, audio.Length);
+
+            if (writeRaw.Checked)
+              _AudioWriter.Write(audio);
+          }
         }
-
-        if (audioPacket != null)
+        finally
         {
-          IntPtr audioPointer;
-          audioPacket.GetBytes(out audioPointer);
-
-          var frameCount = audioPacket.GetSampleFrameCount();
-
-          var audio = new byte[frameCount * _AudioChannels * (_AudioSampleDepth / 8)];
-          Marshal.Copy(audioPointer, audio, 0, audio.Length);
-
-          if (writeRaw.Checked)
-            _AudioWriter.Write(audio);
+          _VideoLock.Release();
         }
       }
       finally
@@ -296,6 +408,8 @@ namespace VideoTest
       if (theFrame == null) return;
       try
       {
+        if (!_Streaming) return;
+
         Interlocked.Increment(ref _PreviewCount);
         Run(() => previewCount.Text = _PreviewCount.ToString());
 
